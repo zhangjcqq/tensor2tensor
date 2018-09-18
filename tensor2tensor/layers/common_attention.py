@@ -1432,7 +1432,8 @@ def dot_product_attention(q,
                           name=None,
                           make_image_summary=True,
                           save_weights_to=None,
-                          dropout_broadcast_dims=None):
+                          dropout_broadcast_dims=None,
+                          horu=''):
   """Dot-product attention.
 
   Args:
@@ -1462,6 +1463,25 @@ def dot_product_attention(q,
     if bias is not None:
       bias = common_layers.cast_like(bias, logits)
       logits += bias
+    if horu == '':
+        pass
+    elif horu == '322':
+        # FIXME: assume 4D tensor with shape [batch, nhead, length_q, length_kv]
+        logits_transpose = tf.transpose(logits, [1, 0, 2, 3])
+        logits_t_list = tf.split(logits_transpose, num_or_size_splits=1, axis=0)
+
+        # FIXME: use loop instead
+        d0 = logits_t_list[0]
+        logits_t_list[0] = d0 @ d0 @ d0
+        d1 = logits_t_list[1]
+        logits_t_list[1] = d1 @ d1
+        d2 = logits_t_list[2]
+        logits_t_list[2] = d2 @ d2
+
+        logits_t_stack= tf.stack(logits_t_list, axis=0)
+        logits = tf.transpose(logits_t_stack, [1, 0, 2, 3])
+    else:
+        raise NotImplementedError
     weights = tf.nn.softmax(logits, name="attention_weights")
     if save_weights_to is not None:
       save_weights_to[scope.name] = weights
@@ -3296,6 +3316,7 @@ def multihead_attention(query_antecedent,
                         make_image_summary=True,
                         dropout_broadcast_dims=None,
                         vars_3d=False,
+                        horu='', # default '' for only 1st order relation unit
                         **kwargs):
   """Multihead scaled-dot-product attention with input/output transformations.
 
@@ -3443,7 +3464,8 @@ def multihead_attention(query_antecedent,
       x = dot_product_attention(q, k, v, bias, dropout_rate, image_shapes,
                                 save_weights_to=save_weights_to,
                                 make_image_summary=make_image_summary,
-                                dropout_broadcast_dims=dropout_broadcast_dims)
+                                dropout_broadcast_dims=dropout_broadcast_dims,
+                                horu=horu)
     elif attention_type == "dot_product_relative":
       x = dot_product_attention_relative(
           q,
